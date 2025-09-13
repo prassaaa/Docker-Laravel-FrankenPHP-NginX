@@ -14,7 +14,9 @@ x-php: &php
 
 services:
     nginx:
-        image: nginx:1.27-alpine
+        build:
+            context: docker/nginx
+            dockerfile: nginx.dockerfile
         restart: unless-stopped
         ports:
             - "80:80"
