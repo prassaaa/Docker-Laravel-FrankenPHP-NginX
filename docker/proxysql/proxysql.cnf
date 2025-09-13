@@ -1,0 +1,164 @@
+# ProxySQL Configuration for Laravel MySQL/MariaDB
+# Optimized for connection pooling and performance
+
+datadir="/var/lib/proxysql"
+
+admin_variables=
+{
+    admin_credentials="admin:admin;stats:stats"
+    mysql_ifaces="0.0.0.0:6032"
+    refresh_interval=2000
+    web_enabled=true
+    web_port=6080
+    stats_credentials="stats:stats"
+}
+
+mysql_variables=
+{
+    threads=4
+    max_connections=2048
+    default_query_delay=0
+    default_query_timeout=36000000
+    have_compress=true
+    poll_timeout=2000
+    interfaces="0.0.0.0:6033"
+    default_schema="information_schema"
+    stacksize=1048576
+    server_version="8.0.33"
+    connect_timeout_server=10000
+    monitor_username="monitor"
+    monitor_password="monitor"
+    monitor_history=60000
+    monitor_connect_interval=60000
+    monitor_ping_interval=10000
+    monitor_read_only_interval=1500
+    monitor_read_only_timeout=500
+    ping_interval_server_msec=10000
+    ping_timeout_server=500
+    commands_stats=true
+    sessions_sort=true
+    connect_retries_on_failure=10
+    connection_max_age_ms=3600000
+    max_allowed_packet=67108864
+    automatic_detect_sqli=1
+    firewall_whitelist_enabled=0
+    firewall_whitelist_errormsg="Query blocked by ProxySQL firewall"
+}
+
+# MySQL Servers Configuration
+mysql_servers =
+(
+    {
+        hostgroup_id=0
+        hostname="mysql"
+        port=3306
+        weight=1000
+        max_connections=100
+        max_replication_lag=0
+        use_ssl=0
+        max_latency_ms=0
+        comment="Primary MySQL/MariaDB Server"
+    }
+    # Add read replicas here with hostgroup_id=1
+)
+
+# MySQL Users
+mysql_users =
+(
+    {
+        username="laravel"
+        password="laravel_password"
+        default_hostgroup=0
+        active=1
+        max_connections=200
+        default_schema="laravel"
+        transaction_persistent=1
+        fast_forward=0
+        backend=1
+        frontend=1
+    }
+)
+
+# Query Rules for Read/Write Splitting
+mysql_query_rules =
+(
+    {
+        rule_id=1
+        active=1
+        match_pattern="^SELECT .* FOR UPDATE"
+        destination_hostgroup=0
+        apply=1
+        comment="Route SELECT FOR UPDATE to primary"
+    },
+    {
+        rule_id=2
+        active=1
+        match_pattern="^SELECT .*"
+        destination_hostgroup=1
+        apply=1
+        comment="Route SELECT queries to read replicas"
+    },
+    {
+        rule_id=3
+        active=1
+        match_pattern=".*"
+        destination_hostgroup=0
+        apply=1
+        comment="Route all other queries to primary"
+    }
+)
+
+# Query Cache Configuration
+mysql_query_rules_cache =
+(
+    {
+        rule_id=1
+        active=1
+        digest="0x..."
+        destination_hostgroup=1
+        cache_ttl=5000
+        apply=1
+    }
+)
+
+# Replication Host Groups
+mysql_replication_hostgroups =
+(
+    {
+        writer_hostgroup=0
+        reader_hostgroup=1
+        check_type="read_only"
+        comment="MySQL Replication Group"
+    }
+)
+
+# Connection Pool Configuration
+mysql_group_replication_hostgroups =
+(
+    {
+        writer_hostgroup=0
+        reader_hostgroup=1
+        backup_writer_hostgroup=2
+        offline_hostgroup=3
+        active=1
+        max_writers=1
+        writer_is_also_reader=1
+        max_transactions_behind=100
+    }
+)
+
+# Scheduler
+scheduler =
+(
+    {
+        id=1
+        active=1
+        interval_ms=10000
+        filename="/usr/share/proxysql/tools/proxysql_galera_checker.sh"
+        arg1="0"
+        arg2="1"
+        arg3="1"
+        arg4="1"
+        arg5="/var/lib/proxysql/proxysql_galera_checker.log"
+    }
+)
