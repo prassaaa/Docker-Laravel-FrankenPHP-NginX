@@ -1,0 +1,124 @@
+# Version Control
+.git
+.gitignore
+.gitattributes
+.github
+
+# IDE and Editor files
+.idea
+.vscode
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Documentation
+*.md
+README*
+LICENSE*
+CHANGELOG*
+docs/
+documentation/
+
+# Development files
+.env.example
+.env.local
+.env.*.local
+.editorconfig
+.php_cs
+.php_cs.cache
+phpunit.xml
+phpcs.xml
+.phpunit.result.cache
+
+# Dependencies
+/vendor
+/node_modules
+bower_components/
+
+# Build artifacts
+/public/build
+/public/hot
+/public/mix-manifest.json
+/public/css
+/public/js
+/storage/*.key
+/storage/framework/cache/*
+/storage/framework/sessions/*
+/storage/framework/testing/*
+/storage/framework/views/*
+/storage/logs/*
+
+# Test files
+/tests
+/test
+*.test.js
+*.spec.js
+
+# Docker files (if building within context)
+docker-compose*.yml
+Dockerfile*
+.dockerignore
+
+# CI/CD
+.travis.yml
+.gitlab-ci.yml
+bitbucket-pipelines.yml
+.circleci/
+azure-pipelines.yml
+
+# Package managers
+composer.phar
+package-lock.json
+yarn.lock
+yarn-error.log
+npm-debug.log
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+*.cache
+*.bak
+*.backup
+*.log
+
+# Laravel specific
+.env.backup
+.maintenance
+Homestead.json
+Homestead.yaml
+Vagrantfile
+
+# Frontend build tools
+webpack.config.js
+webpack.mix.js
+postcss.config.js
+tailwind.config.js
+vite.config.js
+tsconfig.json
+babel.config.js
+
+# Scripts and tools
+/scripts
+/tools
+*.sh
+!docker/*/config/*.sh
+
+# Monitoring and metrics
+/monitoring
+/metrics
+*.log
+
+# Benchmarks and performance tests
+benchmark*
+performance*

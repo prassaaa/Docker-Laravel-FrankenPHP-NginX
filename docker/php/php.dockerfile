@@ -5,37 +5,61 @@ ARG ENVIRONMENT=development
 # This stage installs all build-time dependencies and tools.
 FROM dunglas/frankenphp:1.7-php8.4-alpine AS builder
 
+# Cache package index separately for better caching
+RUN apk update && apk upgrade
+
 # Install build-time OS dependencies and PECL for extensions
+# Split into logical groups for better cache invalidation
 RUN apk add --no-cache \
     $PHPIZE_DEPS \
+    linux-headers
+
+# Install development libraries
+RUN apk add --no-cache \
     curl-dev \
-    git \
     icu-dev \
     libxml2-dev \
     libzip-dev \
     libpng-dev \
     oniguruma-dev \
-    linux-headers \
     postgresql-dev
 
-# Install PHP extensions using PECL for simplicity and standard practice
-RUN pecl install redis-6.2.0 \
-    && docker-php-ext-enable redis
+# Install build tools
+RUN apk add --no-cache \
+    git \
+    make \
+    autoconf \
+    g++
 
-# Install Excimer extension using PECL
-RUN pecl channel-update pecl.php.net \
-    && pecl install excimer \
-    && docker-php-ext-enable excimer
+# Configure PHP extensions before installation for better caching
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg && \
+    docker-php-ext-configure intl && \
+    docker-php-ext-configure zip
 
-# Install other extensions
+# Install PHP extensions in one layer
 RUN docker-php-ext-install -j$(nproc) \
     bcmath \
     gd \
     intl \
+    mbstring \
     pcntl \
     pdo_pgsql \
-    mbstring \
     zip
+
+# Install PECL extensions separately for cache efficiency
+RUN pecl channel-update pecl.php.net && \
+    pecl install --onlyreqdeps --nobuild redis-6.2.0 && \
+    cd "$(pecl config-get temp_dir)/redis" && \
+    phpize && ./configure && make && make install && \
+    docker-php-ext-enable redis && \
+    cd - && rm -rf "$(pecl config-get temp_dir)/redis"
+
+# Install Excimer extension
+RUN pecl install --onlyreqdeps --nobuild excimer && \
+    cd "$(pecl config-get temp_dir)/excimer" && \
+    phpize && ./configure && make && make install && \
+    docker-php-ext-enable excimer && \
+    cd - && rm -rf "$(pecl config-get temp_dir)/excimer"
 
 # Install Composer
 COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
@@ -64,7 +88,17 @@ COPY --from=builder /usr/local/lib/php/extensions/ /usr/local/lib/php/extensions
 COPY --from=builder /usr/local/etc/php/conf.d/ /usr/local/etc/php/conf.d/
 
 # Install only RUNTIME OS dependencies
-RUN apk add --no-cache icu-libs libxml2 libzip libpng oniguruma libpq
+# Add --virtual flag for better cleanup
+RUN apk add --no-cache \
+    icu-libs \
+    libxml2 \
+    libzip \
+    libpng \
+    libjpeg-turbo \
+    freetype \
+    oniguruma \
+    libpq \
+    && rm -rf /var/cache/apk/*
 
 # Create a non-root user with the provided IDs. This is the main fix.
 RUN addgroup -g ${GROUP_ID} -S appgroup && \
@@ -113,8 +147,10 @@ RUN rm -f $PHP_INI_DIR/conf.d/opcache-dev.ini
 # Select the final image based on the ENVIRONMENT build argument
 FROM ${ENVIRONMENT}
 
-# Copy startup script
+# Copy startup script and health check
 COPY --chmod=755 config/startup.sh /usr/local/bin/startup.sh
+COPY --chmod=755 config/healthcheck.sh /usr/local/bin/healthcheck.sh
+COPY config/health-endpoint.php /srv/public/health.php
 
 # Environment variables for FrankenPHP
 ENV FRANKENPHP_CONFIG=/etc/caddy/Caddyfile
@@ -127,6 +163,10 @@ USER appuser
 
 # Use startup script as entrypoint
 ENTRYPOINT ["/usr/local/bin/startup.sh"]
+
+# Health check configuration
+HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
+    CMD /usr/local/bin/healthcheck.sh || exit 1
 
 # Default command
 CMD ["frankenphp", "run", "--config", "/etc/caddy/Caddyfile"]
