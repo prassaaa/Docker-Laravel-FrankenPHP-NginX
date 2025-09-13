@@ -1,0 +1,86 @@
+{
+    # Global options
+    auto_https off
+    servers {
+        protocols h1 h2 h3
+    }
+}
+
+:8080 {
+    # Set root directory
+    root * /srv/public
+
+    # Enable compression
+    encode zstd gzip
+
+    # FrankenPHP configuration
+    php_server {
+        # Worker mode configuration
+        worker {
+            # Worker script
+            file /srv/public/index.php
+            
+            # Number of workers (2 * CPU cores is a good starting point)
+            num 4
+            
+            # Environment variables for workers
+            env APP_RUNTIME "octane"
+            env OCTANE_SERVER "frankenphp"
+            
+            # Watch for file changes in development
+            watch /srv/app
+            watch /srv/bootstrap
+            watch /srv/config
+            watch /srv/resources
+            watch /srv/routes
+            watch /srv/.env
+        }
+        
+        # Request handling
+        resolve_root_symlink
+        env REQUEST_URI {path}
+    }
+
+    # File server
+    file_server
+
+    # Logging
+    log {
+        output stderr
+        format console
+        level ERROR
+    }
+
+    # Headers
+    header {
+        # Security headers
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+        X-XSS-Protection "1; mode=block"
+        
+        # Remove server header
+        -Server
+        
+        # Cache headers for static assets
+        ?Cache-Control "public, max-age=31536000, immutable"
+    }
+
+    # Handle specific routes
+    @static {
+        path *.ico *.css *.js *.gif *.jpg *.jpeg *.png *.svg *.woff *.woff2 *.ttf *.eot
+    }
+
+    handle @static {
+        header Cache-Control "public, max-age=31536000, immutable"
+    }
+
+    # Health check endpoint
+    handle /health {
+        respond "OK" 200
+    }
+
+    # Metrics endpoint (if needed)
+    handle /metrics {
+        metrics
+    }
+}

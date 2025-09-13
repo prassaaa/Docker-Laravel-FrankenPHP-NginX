@@ -40,6 +40,10 @@ services:
     <<: [*php, *logging]
     environment:
       - SERVER_NAME=:8080
+      - APP_ENV=production
+      - FRANKENPHP_WORKERS=auto
+      - FRANKENPHP_MAX_REQUESTS=1000
+      - AUTO_MIGRATE=false
 
   scheduler:
     <<: [*php, *logging]

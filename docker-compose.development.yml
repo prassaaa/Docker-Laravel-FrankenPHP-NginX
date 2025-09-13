@@ -39,6 +39,10 @@ services:
         <<: *php
         environment:
             - SERVER_NAME=:8080
+            - APP_ENV=local
+            - FRANKENPHP_WORKERS=auto
+            - FRANKENPHP_MAX_REQUESTS=500
+            - AUTO_MIGRATE=false
 
     scheduler:
         <<: *php

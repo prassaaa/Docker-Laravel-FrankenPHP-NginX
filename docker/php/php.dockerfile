@@ -73,6 +73,11 @@ RUN addgroup -g ${GROUP_ID} -S appgroup && \
 # Create and set permissions for Caddy data directory
 RUN mkdir -p /data/caddy && chown -R appuser:appgroup /data
 
+# Copy PHP configuration files
+COPY config/*.ini $PHP_INI_DIR/conf.d/
+COPY config/Caddyfile /etc/caddy/Caddyfile
+COPY config/preload.php /srv/docker/php/config/preload.php
+
 
 # STAGE 3: Development
 # The development-specific image
@@ -83,6 +88,11 @@ ARG GROUP_ID
 
 # Use development php.ini
 RUN cp $PHP_INI_DIR/php.ini-development $PHP_INI_DIR/php.ini
+
+# Copy development-specific configurations
+RUN mv $PHP_INI_DIR/conf.d/opcache.ini $PHP_INI_DIR/conf.d/opcache.ini.prod && \
+    cp $PHP_INI_DIR/conf.d/opcache-dev.ini $PHP_INI_DIR/conf.d/opcache.ini && \
+    rm $PHP_INI_DIR/conf.d/opcache-dev.ini
 
 # Create coverage directory and set correct ownership using the dynamic user
 RUN mkdir -p /opt/phpstorm-coverage && \
@@ -95,16 +105,28 @@ FROM base AS production
 # Use production php.ini
 RUN cp $PHP_INI_DIR/php.ini-production $PHP_INI_DIR/php.ini
 
+# Remove development configurations for production
+RUN rm -f $PHP_INI_DIR/conf.d/opcache-dev.ini
+
 
 # FINAL STAGE
 # Select the final image based on the ENVIRONMENT build argument
 FROM ${ENVIRONMENT}
 
-# Serve the application using FrankenPHP
-CMD ["php", "artisan", "octane:frankenphp", "--watch", "--host=0.0.0.0", "--port=8080"]
+# Copy startup script
+COPY --chmod=755 config/startup.sh /usr/local/bin/startup.sh
+
+# Environment variables for FrankenPHP
+ENV FRANKENPHP_CONFIG=/etc/caddy/Caddyfile
 
 # Set the working directory
 WORKDIR /srv
 
 # Switch to the non-root user
 USER appuser
+
+# Use startup script as entrypoint
+ENTRYPOINT ["/usr/local/bin/startup.sh"]
+
+# Default command
+CMD ["frankenphp", "run", "--config", "/etc/caddy/Caddyfile"]
