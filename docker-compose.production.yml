@@ -40,6 +40,7 @@ services:
       - ./docker/nginx/ssl:/etc/nginx/ssl:ro
     depends_on:
       - php
+      - redis
     healthcheck:
       test: ["CMD", "nginx", "-t"]
       interval: 30s
@@ -54,6 +55,11 @@ services:
       - FRANKENPHP_WORKERS=auto
       - FRANKENPHP_MAX_REQUESTS=1000
       - AUTO_MIGRATE=false
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+    depends_on:
+      - redis
     deploy:
       resources:
         limits:
@@ -91,6 +97,34 @@ services:
           cpus: '0.5'
           memory: 256M
 
+  redis:
+    <<: *logging
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server /usr/local/etc/redis/redis.conf --requirepass ${REDIS_PASSWORD:-}
+    volumes:
+      - ./docker/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+      - redis_data:/data
+    networks:
+      - default
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 40s
+    environment:
+      - REDIS_REPLICATION_MODE=master
+      - REDIS_MAXMEMORY_POLICY=allkeys-lru
+
 networks:
   default:
     driver: bridge
@@ -104,3 +138,7 @@ networks:
       config:
         - subnet: 172.21.0.0/16
           gateway: 172.21.0.1
+
+volumes:
+  redis_data:
+    driver: local
